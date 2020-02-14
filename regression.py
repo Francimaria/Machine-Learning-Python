@@ -1,9 +1,13 @@
 import pandas as pd 
-import quandl, math
+import quandl, math, datetime
 import numpy as np
 from sklearn import preprocessing, svm
 from sklearn.model_selection import cross_validate, train_test_split
 from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt 
+from matplotlib import style
+
+style.use('ggplot')
 
 df = quandl.get('WIKI/GOOGL')
 df = df[['Adj. Open','Adj. High','Adj. Low','Adj. Close','Adj. Volume']]
@@ -20,12 +24,13 @@ forecast_out = int(math.ceil(0.01*len(df)))
 print(forecast_out)
 
 df['label'] = df[forecast_col].shift(-forecast_out)
-
 X = np.array(df.drop(['label'],1))
 
 X = preprocessing.scale(X)                                      #normalize
-df.dropna(inplace=True)                                         #To drop rows with NaN values
-                                    
+X = X[:-forecast_out]
+X_lately = X[-forecast_out:]
+
+df.dropna(inplace=True)                                        #Drop rows with NaN values                                  
 y = np.array(df['label'])
 y = np.array(df['label'])
 
@@ -36,4 +41,28 @@ clf = LinearRegression(n_jobs=10)                               #The number of j
 clf.fit(X_train, y_train)
 accuracy = clf.score(X_test, y_test)
 
-print(accuracy)
+forecast_set =  clf.predict(X_lately)
+
+print(forecast_set, accuracy, forecast_out)
+
+df['Forecast'] = np.nan
+
+last_date = df.iloc[-1].name 
+last_unix = last_date.timestamp()
+one_day = 86400
+next_unix = last_unix + one_day
+
+
+for i in forecast_set:
+    next_date = datetime.datetime.fromtimestamp(next_unix)
+    next_unix += one_day
+    df.loc[next_date] = [np.nan for _ in range(len(df.columns)-1)] + [i]
+
+#print(df.tail())
+
+df['Adj. Close'].plot()
+df['Forecast'].plot()
+plt.legend(loc=4)
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.show()
